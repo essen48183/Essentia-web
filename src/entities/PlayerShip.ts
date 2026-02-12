@@ -30,6 +30,11 @@ export class PlayerShip extends Phaser.GameObjects.Sprite {
   controllerFireHeld = false;
   controllerLeftTriggerDown = false;
 
+  // Touch input
+  touchDx = 0;
+  touchDy = 0;
+  touchFiring = false;
+
   get movingUp(): boolean { return this.keyUp || this.ctrlUp; }
   get movingDown(): boolean { return this.keyDown || this.ctrlDown; }
   get movingLeft(): boolean { return this.keyLeft || this.ctrlLeft; }
@@ -92,6 +97,13 @@ export class PlayerShip extends Phaser.GameObjects.Sprite {
     if (dx !== 0 && dy !== 0) {
       dx *= 0.707;
       dy *= 0.707;
+    }
+
+    // Touch joystick overrides digital input when active
+    if (this.touchDx !== 0 || this.touchDy !== 0) {
+      const mag = Math.hypot(this.touchDx, this.touchDy);
+      dx = mag > 1 ? this.touchDx / mag : this.touchDx;
+      dy = mag > 1 ? this.touchDy / mag : this.touchDy;
     }
 
     // Tilt ship (frames: 0=center, 1=slight-left, 2=hard-left, 3=slight-right, 4=hard-right)

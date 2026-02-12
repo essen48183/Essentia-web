@@ -15,6 +15,7 @@ import { ControlSettings } from '../utils/ControlSettings';
 import { AudioSettings } from '../utils/AudioSettings';
 import { HighScoreManager } from '../utils/HighScoreManager';
 import { GamepadManager } from '../utils/GamepadManager';
+import { TouchControls } from '../utils/VirtualJoystick';
 
 const FONT = '"Courier New", monospace';
 
@@ -46,6 +47,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: HUD;
   private stageManager!: StageManager;
   private gamepadManager = new GamepadManager();
+  private touchControls: TouchControls | null = null;
 
   // Physics groups
   playerGroup!: Phaser.Physics.Arcade.Group;
@@ -148,6 +150,11 @@ export class GameScene extends Phaser.Scene {
     // Input
     this.setupInput();
 
+    // Touch controls (single-player only)
+    if (this.playerCount === 1) {
+      this.touchControls = new TouchControls(this);
+    }
+
     // Music
     this.startBackgroundMusic();
   }
@@ -186,6 +193,18 @@ export class GameScene extends Phaser.Scene {
     // Gamepads
     this.pollGamepads(currentTime);
 
+    // Touch controls
+    if (this.touchControls && this.players[0]?.active) {
+      this.touchControls.update();
+      this.players[0].touchDx = this.touchControls.dx;
+      this.players[0].touchDy = this.touchControls.dy;
+      this.players[0].touchFiring = this.touchControls.isTouching || this.touchControls.fireDown;
+      if (this.touchControls.minePressed) {
+        this.deployMine(this.players[0]);
+        this.touchControls.minePressed = false;
+      }
+    }
+
     // Players
     for (const player of this.alivePlayers) {
       player.updateShip(dt);
@@ -200,7 +219,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Auto-fire
-      if (player.isFiring || player.controllerFireHeld) {
+      if (player.isFiring || player.controllerFireHeld || player.touchFiring) {
         const shots = player.tryFire(currentTime);
         for (const shot of shots) {
           let proj: Projectile;
@@ -762,6 +781,7 @@ export class GameScene extends Phaser.Scene {
     this.stateBeforePause = this.gameState;
     this.gameState = GameState.Paused;
     this.physics.pause();
+    if (this.touchControls) this.touchControls.enabled = false;
     if (this.bgMusic && 'setVolume' in this.bgMusic) {
       (this.bgMusic as Phaser.Sound.WebAudioSound).setVolume(AudioSettings.musicVolume * 0.3);
     }
@@ -847,6 +867,7 @@ export class GameScene extends Phaser.Scene {
   private resumeGame(): void {
     this.gameState = this.stateBeforePause;
     this.physics.resume();
+    if (this.touchControls) this.touchControls.enabled = true;
     this.pauseOverlay?.destroy();
     this.pauseOverlay = null;
     this.pauseMenuLabels = [];
@@ -974,14 +995,18 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // Mouse (1P only)
+    // Mouse / touch (1P only) — guard against touch-control pointers
     if (this.playerCount === 1) {
-      this.input.on('pointerdown', () => {
+      this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (this.touchControls?.isTrackingPointer(pointer.id)) return;
+        // Ignore taps in the joystick activation zone (bottom-left quadrant)
+        if (pointer.x < C.SCREEN_WIDTH / 2 && pointer.y > C.SCREEN_HEIGHT / 2) return;
         if (this.gameState === GameState.Playing || this.gameState === GameState.BossFight) {
           if (this.players[0]?.active) this.players[0].isFiring = true;
         }
       });
-      this.input.on('pointerup', () => {
+      this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        if (this.touchControls?.isTrackingPointer(pointer.id)) return;
         if (this.players[0]) this.players[0].isFiring = false;
       });
     }

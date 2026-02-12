@@ -58,3 +58,10 @@ export const Z_PLAYER = 30;
 export const Z_PROJECTILE = 40;
 export const Z_EXPLOSION = 50;
 export const Z_HUD = 100;
+
+// Virtual joystick / touch controls
+export const JOYSTICK_BASE_RADIUS = 60;
+export const JOYSTICK_THUMB_RADIUS = 25;
+export const JOYSTICK_MAX_DISTANCE = 55;
+export const JOYSTICK_DEAD_ZONE = 0.15;
+export const TOUCH_BUTTON_RADIUS = 40;
